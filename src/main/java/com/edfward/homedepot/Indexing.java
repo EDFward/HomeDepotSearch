@@ -5,7 +5,6 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.en.EnglishAnalyzer;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StringField;
@@ -19,6 +18,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.file.FileSystems;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiFunction;
@@ -40,7 +40,7 @@ class Product {
 
 public class Indexing {
 
-  private static final String PRODUCT_ID = "product_uid";
+  public static final Path INDEX_PATH = FileSystems.getDefault().getPath("index");
 
   public static void main(String[] args) throws IOException {
     Indexing indexing = new Indexing();
@@ -55,7 +55,7 @@ public class Indexing {
     Reader reader = new InputStreamReader(getClass().getResourceAsStream(filePath));
     CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withHeader());
     for (CSVRecord record : csvParser) {
-      long id = Long.parseLong(record.get(PRODUCT_ID));
+      long id = Long.parseLong(record.get(Constants.CSV_PRODUCT_ID));
       Product product = products.get(id);
       if (product == null) {
         product = new Product();
@@ -93,22 +93,27 @@ public class Indexing {
     // TODO: Parse attributes.
 
     // Init Lucene stuff.
-    Analyzer analyzer = new StandardAnalyzer();
-    Directory directory = FSDirectory.open(FileSystems.getDefault().getPath("index"));
+    Analyzer analyzer = new EnglishAnalyzer();
+    Directory directory = FSDirectory.open(INDEX_PATH);
     IndexWriterConfig config = new IndexWriterConfig(analyzer);
     IndexWriter writer = new IndexWriter(directory, config);
 
+    Document doc = new Document();
+    // Do not analyze ID.
+    StringField idField = new StringField("id", "", Field.Store.YES);
+    doc.add(idField);
+    // Analyze title and description.
+    TextField titleField = new TextField("title", "", Field.Store.NO);
+    doc.add(titleField);
+    TextField descriptionField = new TextField("description", "", Field.Store.NO);
+    doc.add(descriptionField);
     // Write index.
     for (Map.Entry<Long, Product> entry : products.entrySet()) {
       Long id = entry.getKey();
       Product product = entry.getValue();
-      Document doc = new Document();
-      // Do not analyze ID.
-      doc.add(new StringField("id", id.toString(), Field.Store.YES));
-      // Analyze title and description.
-      doc.add(new TextField("title", product.title, Field.Store.NO));
-      doc.add(new TextField("description", product.description, Field.Store.NO));
-
+      idField.setStringValue(id.toString());
+      titleField.setStringValue(product.title);
+      descriptionField.setStringValue(product.description);
       writer.addDocument(doc);
     }
     writer.close();
