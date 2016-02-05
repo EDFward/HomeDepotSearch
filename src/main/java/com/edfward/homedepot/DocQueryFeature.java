@@ -47,7 +47,7 @@ public class DocQueryFeature {
   public static void main(String[] args) throws IOException, ParseException {
     DocQueryFeature scoring = new DocQueryFeature();
     scoring.featureTransform("data/train.csv", "data/train-feature-6.csv");
-//    scoring.featureTransform("/test.csv", "data/test-feature.csv");
+    scoring.featureTransform("data/test.csv", "data/test-feature-6.csv");
   }
 
   // Transform `train.csv` or `test.csv` to feature vector files.
