@@ -14,6 +14,7 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -52,10 +53,10 @@ public class Indexing {
       Map<Long, Product> products,
       // Pass a lambda to modify the product.
       BiFunction<Product, CSVRecord, Void> productModifier) throws IOException {
-    Reader reader = new InputStreamReader(getClass().getResourceAsStream(filePath));
+    Reader reader = new InputStreamReader((new FileInputStream(filePath)));
     CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withHeader());
     for (CSVRecord record : csvParser) {
-      long id = Long.parseLong(record.get(Constants.CSV_PRODUCT_ID));
+      long id = Long.parseLong(record.get(Constant.CSV_PRODUCT_ID));
       Product product = products.get(id);
       if (product == null) {
         product = new Product();
@@ -68,21 +69,21 @@ public class Indexing {
   // Parse `train.csv` and `test.csv` for product titles.
   public void parseTitle(Map<Long, Product> products) throws IOException {
     BiFunction<Product, CSVRecord, Void> modifier = (product, record) -> {
-      product.title = record.get("product_title");
+      product.title = record.get(Constant.CSV_TITLE);
       return null;
     };
 
-    parse("/train.csv", products, modifier);
-    parse("/test.csv", products, modifier);
+    parse("data/train.csv", products, modifier);
+    parse("data/test.csv", products, modifier);
   }
 
   // Parse `product_descriptions.csv` for product descriptions.
   public void parseDescription(Map<Long, Product> products) throws IOException {
     BiFunction<Product, CSVRecord, Void> modifier = (product, record) -> {
-      product.description = record.get("product_description");
+      product.description = record.get(Constant.CSV_DESCRIPTION);
       return null;
     };
-    parse("/product_descriptions.csv", products, modifier);
+    parse("data/product_descriptions.csv", products, modifier);
   }
 
   public void index() throws IOException {
@@ -100,12 +101,12 @@ public class Indexing {
 
     Document doc = new Document();
     // Do not analyze ID.
-    StringField idField = new StringField("id", "", Field.Store.YES);
+    StringField idField = new StringField(Constant.FIELD_ID, "", Field.Store.YES);
     doc.add(idField);
     // Analyze title and description.
-    TextField titleField = new TextField("title", "", Field.Store.NO);
+    TextField titleField = new TextField(Constant.FIELD_TITLE, "", Field.Store.YES);
     doc.add(titleField);
-    TextField descriptionField = new TextField("description", "", Field.Store.NO);
+    TextField descriptionField = new TextField(Constant.FIELD_DESCRIPTION, "", Field.Store.YES);
     doc.add(descriptionField);
     // Write index.
     for (Map.Entry<Long, Product> entry : products.entrySet()) {

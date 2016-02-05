@@ -1,6 +1,6 @@
 package com.edfward.homedepot;
 
-public class Constants {
+public class Constant {
 
   public static final String FIELD_ID = "id";
 
@@ -13,5 +13,9 @@ public class Constants {
   public static final String CSV_SEARCH_TERM = "search_term";
 
   public static final String CSV_RELEVANCE = "relevance";
+
+  public static final String CSV_TITLE = "product_title";
+
+  public static final String CSV_DESCRIPTION = "product_description";
 
 }
