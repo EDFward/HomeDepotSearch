@@ -6,7 +6,6 @@ import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.en.EnglishAnalyzer;
-import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.classic.ParseException;
@@ -28,15 +27,11 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 
+
 public class NaiveScoring {
   private IndexSearcher searcher;
 
   private Analyzer analyzer;
-
-  public static void main(String[] args) throws IOException, ParseException {
-    NaiveScoring scoring = new NaiveScoring();
-    scoring.score("data/test.csv", "data/result-naive-scoring.csv");
-  }
 
   public NaiveScoring() throws IOException {
     Directory directory = FSDirectory.open(Indexing.INDEX_PATH);
@@ -44,6 +39,11 @@ public class NaiveScoring {
     searcher = new IndexSearcher(indexReader);
     searcher.setSimilarity(new BM25Similarity());
     analyzer = new EnglishAnalyzer();
+  }
+
+  public static void main(String[] args) throws IOException, ParseException {
+    NaiveScoring scoring = new NaiveScoring();
+    scoring.score("data/test.csv", "data/result-naive-scoring.csv");
   }
 
   public void score(String inputFilePath, String outputFilePath) throws IOException, ParseException {
