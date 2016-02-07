@@ -12,10 +12,58 @@ import org.apache.lucene.search.similarities.BM25Similarity;
 import org.apache.lucene.search.similarities.ClassicSimilarity;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 
 class SearchFeature extends FeatureBase {
-  protected final float score(Long productId, String searchTerms, String field, SearchSimilarity sim)
+  // Build query of sequential dependence model.
+  private final Query buildSDMQuery(String searchQuery, String field) throws ParseException {
+    String[] terms = Arrays.stream(searchQuery.toLowerCase().split("\\s+"))
+        .map(QueryParser::escape)
+        .filter(s -> !s.equals("and") && !s.equals("or"))
+        .toArray(String[]::new);
+
+    // Also serve as a query builder.
+    QueryParser queryParser = new QueryParser(field, analyzer);
+
+    if (terms.length == 0) {
+      // Simply parse the original search terms.
+      return queryParser.parse(QueryParser.escape(searchQuery));
+    }
+
+    // Query part 1: 'OR' connected terms.
+    Query concatQuery = queryParser.createBooleanQuery(
+        field,
+        Arrays.stream(terms).collect(Collectors.joining(" ")),
+        BooleanClause.Occur.SHOULD);
+
+    BooleanQuery.Builder nearQueryBuilder = new BooleanQuery.Builder(),
+        windowQueryBuilder = new BooleanQuery.Builder();
+    for (int i = 0; i < terms.length - 1; ++i) {
+      // Near query requires exact phrase match.
+      Query nearQuery = queryParser.createPhraseQuery(field, terms[i] + ' ' + terms[i + 1]);
+      if (nearQuery != null) {
+        nearQueryBuilder.add(nearQuery, BooleanClause.Occur.SHOULD);
+      }
+      // Window size is 8.
+      Query windowQuery = queryParser.createPhraseQuery(field, terms[i] + ' ' + terms[i + 1], 8);
+      if (windowQuery != null) {
+        windowQueryBuilder.add(windowQuery, BooleanClause.Occur.SHOULD);
+      }
+    }
+
+    Query finalQuery = new BooleanQuery.Builder()
+        .add(concatQuery, BooleanClause.Occur.SHOULD)
+        // Query part 2: Near query, match exact bigrams.
+        .add(nearQueryBuilder.build(), BooleanClause.Occur.SHOULD)
+        // Query part 3: Window query, match two terms inside a window of size 8.
+        .add(windowQueryBuilder.build(), BooleanClause.Occur.SHOULD)
+        .build();
+    return finalQuery;
+  }
+
+  protected final float score(Long productId, String searchQuery, String field, SearchSimilarity sim)
       throws ParseException, IOException {
 
     switch (sim) {
@@ -28,12 +76,11 @@ class SearchFeature extends FeatureBase {
     }
 
     Query idQuery = new TermQuery(new Term(Constant.FIELD_ID, productId.toString()));
-    QueryParser fieldParser = new QueryParser(field, analyzer);
-    Query fieldQuery = fieldParser.parse(QueryParser.escape(searchTerms));
+    Query sdmQuery = buildSDMQuery(searchQuery, field);
 
     BooleanQuery query = new BooleanQuery.Builder()
         .add(idQuery, BooleanClause.Occur.FILTER)
-        .add(fieldQuery, BooleanClause.Occur.SHOULD)
+        .add(sdmQuery, BooleanClause.Occur.SHOULD)
         .build();
 
     TopDocs docs = searcher.search(query, 1);
