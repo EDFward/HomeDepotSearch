@@ -60,20 +60,20 @@ public class NaiveScoring {
 
       for (CSVRecord record : csvParser) {
         String id = record.get("id");  // Row ID.
-        Long productId = Long.parseLong(record.get(Constant.CSV_PRODUCT_ID));
+        Long productID = Long.parseLong(record.get(Constant.CSV_PRODUCT_ID));
         String terms = record.get(Constant.CSV_SEARCH_TERM);
-        int score = scoreTerms(productId, terms);
+        int score = scoreTerms(productID, terms);
         csvPrinter.printRecord(new Object[]{id, score});
       }
     }
   }
 
-  private int scoreTerms(long productId, String terms) throws ParseException, IOException {
+  private int scoreTerms(long productID, String terms) throws ParseException, IOException {
     String escapedTerms = QueryParser.escape(terms);
 
     // Find internal document ID.
-    Query idQuery = new TermQuery(new Term(Constant.FIELD_ID, String.valueOf(productId)));
-    int internalId = searcher.search(idQuery, 1).scoreDocs[0].doc;
+    Query idQuery = new TermQuery(new Term(Constant.FIELD_ID, String.valueOf(productID)));
+    int internalID = searcher.search(idQuery, 1).scoreDocs[0].doc;
 
     // Search by terms.
     QueryParser titleParser = new QueryParser(Constant.FIELD_TITLE, analyzer);
@@ -91,7 +91,7 @@ public class NaiveScoring {
     int rank = 0;
     boolean found = false;
     for (ScoreDoc scoreDoc : docs.scoreDocs) {
-      if (internalId == scoreDoc.doc) {
+      if (internalID == scoreDoc.doc) {
         found = true;
         break;
       }

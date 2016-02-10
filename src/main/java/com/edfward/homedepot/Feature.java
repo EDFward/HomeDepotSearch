@@ -14,7 +14,7 @@ import java.io.IOException;
 interface Feature {
   String getName();
 
-  float getValue(Long productId, String searchTerms) throws IOException, ParseException;
+  float getValue(Long productID, String searchTerms) throws IOException, ParseException;
 }
 
 

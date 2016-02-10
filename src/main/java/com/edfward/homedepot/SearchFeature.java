@@ -25,29 +25,33 @@ class SearchFeature extends FeatureBase {
         .toArray(String[]::new);
 
     // Also serve as a query builder.
-    QueryParser queryParser = new QueryParser(field, analyzer);
+    QueryParser parser = new QueryParser(field, analyzer);
 
     if (terms.length == 0) {
       // Simply parse the original search terms.
-      return queryParser.parse(QueryParser.escape(searchQuery));
+      return parser.parse(QueryParser.escape(searchQuery));
     }
 
     // Query part 1: 'OR' connected terms.
-    Query concatQuery = queryParser.createBooleanQuery(
+    Query concatQuery = parser.createBooleanQuery(
         field,
         Arrays.stream(terms).collect(Collectors.joining(" ")),
         BooleanClause.Occur.SHOULD);
+    if (concatQuery == null) {
+      // Fallback, again.
+      concatQuery = parser.parse(QueryParser.escape(searchQuery));
+    }
 
     BooleanQuery.Builder nearQueryBuilder = new BooleanQuery.Builder(),
         windowQueryBuilder = new BooleanQuery.Builder();
     for (int i = 0; i < terms.length - 1; ++i) {
       // Near query requires exact phrase match.
-      Query nearQuery = queryParser.createPhraseQuery(field, terms[i] + ' ' + terms[i + 1]);
+      Query nearQuery = parser.createPhraseQuery(field, terms[i] + ' ' + terms[i + 1]);
       if (nearQuery != null) {
         nearQueryBuilder.add(nearQuery, BooleanClause.Occur.SHOULD);
       }
       // Window size is 8.
-      Query windowQuery = queryParser.createPhraseQuery(field, terms[i] + ' ' + terms[i + 1], 8);
+      Query windowQuery = parser.createPhraseQuery(field, terms[i] + ' ' + terms[i + 1], 8);
       if (windowQuery != null) {
         windowQueryBuilder.add(windowQuery, BooleanClause.Occur.SHOULD);
       }
@@ -63,7 +67,7 @@ class SearchFeature extends FeatureBase {
     return finalQuery;
   }
 
-  protected final float score(Long productId, String searchQuery, String field, SearchSimilarity sim)
+  protected final float score(Long productID, String searchQuery, String field, SearchSimilarity sim)
       throws ParseException, IOException {
 
     switch (sim) {
@@ -75,7 +79,7 @@ class SearchFeature extends FeatureBase {
         break;
     }
 
-    Query idQuery = new TermQuery(new Term(Constant.FIELD_ID, productId.toString()));
+    Query idQuery = new TermQuery(new Term(Constant.FIELD_ID, productID.toString()));
     Query sdmQuery = buildSDMQuery(searchQuery, field);
 
     BooleanQuery query = new BooleanQuery.Builder()
@@ -85,7 +89,7 @@ class SearchFeature extends FeatureBase {
 
     TopDocs docs = searcher.search(query, 1);
     if (docs.totalHits != 1) {
-      throw new AssertionError("Couldn't find document with ID " + productId);
+      throw new AssertionError("Couldn't find document with ID " + productID);
     }
 
     return docs.scoreDocs[0].score;
@@ -104,8 +108,8 @@ class BM25TitleFeature extends SearchFeature implements Feature {
   }
 
   @Override
-  public float getValue(Long productId, String searchTerms) throws IOException, ParseException {
-    return super.score(productId, searchTerms, Constant.FIELD_TITLE, SearchSimilarity.BM25);
+  public float getValue(Long productID, String searchTerms) throws IOException, ParseException {
+    return super.score(productID, searchTerms, Constant.FIELD_TITLE, SearchSimilarity.BM25);
   }
 }
 
@@ -117,8 +121,8 @@ class BM25DescriptionFeature extends SearchFeature implements Feature {
   }
 
   @Override
-  public float getValue(Long productId, String searchTerms) throws IOException, ParseException {
-    return super.score(productId, searchTerms, Constant.FIELD_DESCRIPTION, SearchSimilarity.BM25);
+  public float getValue(Long productID, String searchTerms) throws IOException, ParseException {
+    return super.score(productID, searchTerms, Constant.FIELD_DESCRIPTION, SearchSimilarity.BM25);
   }
 }
 
@@ -130,8 +134,8 @@ class TFIDFTitleFeature extends SearchFeature implements Feature {
   }
 
   @Override
-  public float getValue(Long productId, String searchTerms) throws IOException, ParseException {
-    return super.score(productId, searchTerms, Constant.FIELD_TITLE, SearchSimilarity.CLASSIC);
+  public float getValue(Long productID, String searchTerms) throws IOException, ParseException {
+    return super.score(productID, searchTerms, Constant.FIELD_TITLE, SearchSimilarity.CLASSIC);
   }
 }
 
@@ -143,7 +147,7 @@ class TFIDFDescriptionFeature extends SearchFeature implements Feature {
   }
 
   @Override
-  public float getValue(Long productId, String searchTerms) throws IOException, ParseException {
-    return super.score(productId, searchTerms, Constant.FIELD_DESCRIPTION, SearchSimilarity.CLASSIC);
+  public float getValue(Long productID, String searchTerms) throws IOException, ParseException {
+    return super.score(productID, searchTerms, Constant.FIELD_DESCRIPTION, SearchSimilarity.CLASSIC);
   }
 }

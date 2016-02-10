@@ -11,19 +11,19 @@ import org.apache.lucene.search.TopDocs;
 import java.io.IOException;
 
 class OverlapFeature extends FeatureBase {
-  protected final float count(Long productId, String searchTerms, String field) throws IOException {
-    Query idQuery = new TermQuery(new Term(Constant.FIELD_ID, productId.toString()));
+  protected final float count(Long productID, String searchQuery, String field) throws IOException {
+    Query idQuery = new TermQuery(new Term(Constant.FIELD_ID, productID.toString()));
     TopDocs docs = searcher.search(idQuery, 1);
 
     if (docs.totalHits != 1) {
-      throw new AssertionError("Couldn't find document with ID " + productId);
+      throw new AssertionError("Couldn't find document with ID " + productID);
     }
 
     Document doc = searcher.doc(docs.scoreDocs[0].doc);
 
-    searchTerms = searchTerms.toLowerCase();
+    searchQuery = searchQuery.toLowerCase();
     String text = doc.get(field).toLowerCase();
-    return StringUtils.countMatches(text, searchTerms);
+    return StringUtils.countMatches(text, searchQuery);
   }
 }
 
@@ -35,8 +35,8 @@ class OverlapTitleFeature extends OverlapFeature implements Feature {
   }
 
   @Override
-  public float getValue(Long productId, String searchTerms) throws IOException, ParseException {
-    return super.count(productId, searchTerms, Constant.FIELD_TITLE);
+  public float getValue(Long productID, String searchTerms) throws IOException, ParseException {
+    return super.count(productID, searchTerms, Constant.FIELD_TITLE);
   }
 }
 
@@ -48,7 +48,7 @@ class OverlapDescriptionFeature extends OverlapFeature implements Feature {
   }
 
   @Override
-  public float getValue(Long productId, String searchTerms) throws IOException, ParseException {
-    return super.count(productId, searchTerms, Constant.FIELD_DESCRIPTION);
+  public float getValue(Long productID, String searchTerms) throws IOException, ParseException {
+    return super.count(productID, searchTerms, Constant.FIELD_DESCRIPTION);
   }
 }

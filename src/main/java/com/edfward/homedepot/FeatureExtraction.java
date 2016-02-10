@@ -26,15 +26,23 @@ public class FeatureExtraction {
     // extractor.createFeatureCSV("data/train.csv", "data/train-tmp.csv");
 
     // Or, add features to existing feature CSV file.
-    // extractor.addFeatureCSV("data/train.csv", "data/train-feature-6.csv", "data/train-tmp.csv",
-    //    Arrays.asList(new OverlapTitleFeature(), new OverlapDescriptionFeature()));
+    extractor.addFeatureCSV("data/test.csv", "data/test-feature-6.csv", "data/test-tmp-14.csv",
+        Arrays.asList(new TFTitleFeature(), new TFDescriptionFeature(),
+            new TFTitleSIGIRFeature(), new TFDescriptionSIGIRFeature(),
+            new TFTitleNormalizedFeature(), new TFDescriptionNormalizedFeature(),
+            new TFTitleNormalizedSIGIRFeature(), new TFDescriptionNormalizedSIGIRFeature()));
   }
 
   public void createFeatureCSV(String inputQueryFilePath, String outputFeatureFilePath)
       throws IOException, ParseException {
     List<Feature> features = Arrays.asList(
-        new BM25TitleFeature(), new BM25DescriptionFeature(), new TFIDFTitleFeature(), new TFIDFDescriptionFeature(),
-        new OverlapTitleFeature(), new OverlapDescriptionFeature());
+        new BM25TitleFeature(), new BM25DescriptionFeature(),
+        new TFIDFTitleFeature(), new TFIDFDescriptionFeature(),
+        new OverlapTitleFeature(), new OverlapDescriptionFeature(),
+        new TFTitleFeature(), new TFDescriptionFeature(),
+        new TFTitleSIGIRFeature(), new TFDescriptionSIGIRFeature(),
+        new TFTitleNormalizedFeature(), new TFDescriptionNormalizedFeature(),
+        new TFTitleNormalizedSIGIRFeature(), new TFDescriptionNormalizedSIGIRFeature());
     // Automatic Resource Management.
     try (
         CSVParser queryFileParser = CSVParser.parse(
@@ -52,12 +60,12 @@ public class FeatureExtraction {
       outputCSVPrinter.printRecord(headers);
 
       for (CSVRecord queryRecord : queryFileParser) {
-        Long productId = Long.parseLong(queryRecord.get(Constant.CSV_PRODUCT_ID));
+        Long productID = Long.parseLong(queryRecord.get(Constant.CSV_PRODUCT_ID));
         String searchTerms = queryRecord.get(Constant.CSV_SEARCH_TERM);
 
         List<Float> featureRecord = new ArrayList<>(headers.size());
         for (Feature feature : features) {
-          float featureVal = feature.getValue(productId, searchTerms);
+          float featureVal = feature.getValue(productID, searchTerms);
           featureRecord.add(featureVal);
         }
         if (hasRelevance) {
@@ -102,12 +110,12 @@ public class FeatureExtraction {
         CSVRecord queryRecord = qIt.next();
         CSVRecord existingFeatureRecord = fIt.next();
 
-        Long productId = Long.parseLong(queryRecord.get(Constant.CSV_PRODUCT_ID));
+        Long productID = Long.parseLong(queryRecord.get(Constant.CSV_PRODUCT_ID));
         String searchTerms = queryRecord.get(Constant.CSV_SEARCH_TERM);
 
         Map<String, String> featureMap = existingFeatureRecord.toMap();
         for (Feature feature : features) {
-          float featureVal = feature.getValue(productId, searchTerms);
+          float featureVal = feature.getValue(productID, searchTerms);
           featureMap.put(feature.getName(), String.valueOf(featureVal));
         }
 
