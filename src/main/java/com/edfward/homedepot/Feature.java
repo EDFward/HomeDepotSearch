@@ -18,7 +18,7 @@ interface Feature {
 }
 
 
-class FeatureBase {
+abstract class FeatureBase {
   protected static IndexSearcher searcher;
 
   protected static Analyzer analyzer;
@@ -35,4 +35,8 @@ class FeatureBase {
       throw new AssertionError("Failed to read index.");
     }
   }
+}
+
+abstract class FieldFeatureBase extends FeatureBase {
+  abstract protected String getField();
 }

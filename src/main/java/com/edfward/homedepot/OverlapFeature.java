@@ -10,8 +10,15 @@ import org.apache.lucene.search.TopDocs;
 
 import java.io.IOException;
 
-class OverlapFeature extends FeatureBase {
-  protected final float count(Long productID, String searchQuery, String field) throws IOException {
+class OverlapFeature extends FieldFeatureBase implements Feature {
+  private final String field;
+
+  OverlapFeature(String field) {
+    this.field = field;
+  }
+
+  @Override
+  public float getValue(Long productID, String searchTerms) throws IOException, ParseException {
     Query idQuery = new TermQuery(new Term(Constant.FIELD_ID, productID.toString()));
     TopDocs docs = searcher.search(idQuery, 1);
 
@@ -21,34 +28,18 @@ class OverlapFeature extends FeatureBase {
 
     Document doc = searcher.doc(docs.scoreDocs[0].doc);
 
-    searchQuery = searchQuery.toLowerCase();
+    searchTerms = searchTerms.toLowerCase();
     String text = doc.get(field).toLowerCase();
-    return StringUtils.countMatches(text, searchQuery);
+    return StringUtils.countMatches(text, searchTerms);
   }
-}
 
+  @Override
+  protected String getField() {
+    return field;
+  }
 
-class OverlapTitleFeature extends OverlapFeature implements Feature {
   @Override
   public String getName() {
-    return "overlap_title";
-  }
-
-  @Override
-  public float getValue(Long productID, String searchTerms) throws IOException, ParseException {
-    return super.count(productID, searchTerms, Constant.FIELD_TITLE);
-  }
-}
-
-
-class OverlapDescriptionFeature extends OverlapFeature implements Feature {
-  @Override
-  public String getName() {
-    return "overlap_description";
-  }
-
-  @Override
-  public float getValue(Long productID, String searchTerms) throws IOException, ParseException {
-    return super.count(productID, searchTerms, Constant.FIELD_DESCRIPTION);
+    return "overlap_" + field;
   }
 }

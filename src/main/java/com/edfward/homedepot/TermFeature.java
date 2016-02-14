@@ -15,10 +15,10 @@ import org.apache.lucene.util.QueryBuilder;
 import java.io.IOException;
 import java.util.Arrays;
 
-abstract class TermFeature extends FeatureBase {
+abstract class TermFeature extends FieldFeatureBase {
   abstract double calculateStatistics(Long productID, Term term) throws IOException;
 
-  public final int getDocID(Long productID) throws IOException {
+  private final int getDocID(Long productID) throws IOException {
     Query idQuery = new TermQuery(new Term(Constant.FIELD_ID, productID.toString()));
     TopDocs docs = searcher.search(idQuery, 1);
 
@@ -29,7 +29,13 @@ abstract class TermFeature extends FeatureBase {
     return docs.scoreDocs[0].doc;
   }
 
-  public final double getTF(Long productID, Term term) throws IOException {
+  protected final long getDocLen(Long productID) throws IOException {
+    NumericDocValues norms = MultiDocValues.getNormValues(searcher.getIndexReader(), getField());
+    int docID = getDocID(productID);
+    return norms.get(docID);
+  }
+
+  protected final double getTF(Long productID, Term term) throws IOException {
     int docID = getDocID(productID);
     double tf = 0;
 
@@ -45,7 +51,13 @@ abstract class TermFeature extends FeatureBase {
     return tf;
   }
 
-  public final float sum(Long productID, String searchQuery, String field)
+  protected final double getIDF(Term term) throws IOException {
+    double numDoc = searcher.getIndexReader().numDocs();
+    int df = searcher.getIndexReader().docFreq(term) + 1;
+    return numDoc / df;
+  }
+
+  protected final float sum(Long productID, String searchQuery)
       throws ParseException, IOException {
     String[] terms = Arrays.stream(searchQuery.toLowerCase().split("\\s+"))
         .map(QueryParser::escape)
@@ -56,7 +68,7 @@ abstract class TermFeature extends FeatureBase {
 
     QueryBuilder queryBuilder = new QueryBuilder(analyzer);
     for (String term : terms) {
-      Query query = queryBuilder.createBooleanQuery(field, term);
+      Query query = queryBuilder.createBooleanQuery(getField(), term);
       if (query != null && query instanceof TermQuery) {
         Term t = ((TermQuery) query).getTerm();
         sumVal += calculateStatistics(productID, t);
@@ -67,19 +79,29 @@ abstract class TermFeature extends FeatureBase {
   }
 }
 
-class TFTitleFeature extends TermFeature implements Feature {
+/**********
+ * TF based features.
+ **********/
+
+class TFFeature extends TermFeature implements Feature {
+  protected final String field;
+
+  TFFeature(String field) {
+    this.field = field;
+  }
+
   protected String getField() {
-    return Constant.FIELD_TITLE;
+    return field;
   }
 
   @Override
   public String getName() {
-    return "tf_title";
+    return "tf_" + field;
   }
 
   @Override
   public float getValue(Long productID, String searchTerms) throws IOException, ParseException {
-    return sum(productID, searchTerms, getField());
+    return sum(productID, searchTerms);
   }
 
   @Override
@@ -88,101 +110,162 @@ class TFTitleFeature extends TermFeature implements Feature {
   }
 }
 
-class TFDescriptionFeature extends TermFeature implements Feature {
-  protected String getField() {
-    return Constant.FIELD_DESCRIPTION;
+
+class TFSIGIRFeature extends TFFeature implements Feature {
+  TFSIGIRFeature(String field) {
+    super(field);
   }
 
   @Override
   public String getName() {
-    return "tf_description";
+    return "tf_" + field + "_sigir";
+  }
+
+  @Override
+  double calculateStatistics(Long productID, Term term) throws IOException {
+    return Math.log(1 + getTF(productID, term));
+  }
+}
+
+
+class TFNormalizedFeature extends TFFeature implements Feature {
+  TFNormalizedFeature(String field) {
+    super(field);
+  }
+
+  @Override
+  public String getName() {
+    return "tf_" + field + "_norm";
+  }
+
+  @Override
+  double calculateStatistics(Long productID, Term term) throws IOException {
+    long docLen = getDocLen(productID);
+    return getTF(productID, term) / docLen;
+  }
+}
+
+
+class TFNormalizedSIGIRFeature extends TFFeature implements Feature {
+  TFNormalizedSIGIRFeature(String field) {
+    super(field);
+  }
+
+  @Override
+  public String getName() {
+    return "tf_" + field + "_norm_sigir";
+  }
+
+  @Override
+  double calculateStatistics(Long productID, Term term) throws IOException {
+    long docLen = getDocLen(productID);
+    return Math.log(getTF(productID, term) / docLen + 1);
+  }
+}
+
+
+/**********
+ * IDF based features.
+ **********/
+
+
+class IDFFeature extends TermFeature implements Feature {
+  protected String field;
+
+  IDFFeature(String field) {
+    this.field = field;
+  }
+
+  protected String getField() {
+    return field;
+  }
+
+  @Override
+  public String getName() {
+    return "idf_" + field;
   }
 
   @Override
   public float getValue(Long productID, String searchTerms) throws IOException, ParseException {
-    return sum(productID, searchTerms, getField());
+    return sum(productID, searchTerms);
   }
 
   @Override
   double calculateStatistics(Long productID, Term term) throws IOException {
-    return getTF(productID, term);
+    return Math.log(getIDF(term));
   }
 }
 
-class TFTitleSIGIRFeature extends TFTitleFeature implements Feature {
+
+class IDFSIGIRFeature extends IDFFeature implements Feature {
+  IDFSIGIRFeature(String field) {
+    super(field);
+  }
+
   @Override
   public String getName() {
-    return "tf_title_sigir";
+    return "idf_" + field + "_sigir";
   }
 
   @Override
   double calculateStatistics(Long productID, Term term) throws IOException {
-    return Math.log(1 + getTF(productID, term));
+    return Math.log(Math.log(getIDF(term)));
   }
 }
 
-class TFDescriptionSIGIRFeature extends TFDescriptionFeature implements Feature {
+
+class IDFSIGIR2Feature extends IDFFeature implements Feature {
+  IDFSIGIR2Feature(String field) {
+    super(field);
+  }
+
   @Override
   public String getName() {
-    return "tf_description_sigir";
+    return "idf_" + field + "_sigir2";
   }
 
   @Override
   double calculateStatistics(Long productID, Term term) throws IOException {
-    return Math.log(1 + getTF(productID, term));
+    return Math.log(getIDF(term) + 1);
   }
 }
 
-class TFTitleNormalizedFeature extends TFTitleFeature implements Feature {
+
+class IDFSIGIR3Feature extends IDFFeature implements Feature {
+  IDFSIGIR3Feature(String field) {
+    super(field);
+  }
+
   @Override
   public String getName() {
-    return "tf_title_norm";
+    return "idf_" + field + "_sigir3";
   }
 
   @Override
   double calculateStatistics(Long productID, Term term) throws IOException {
-    NumericDocValues norms = MultiDocValues.getNormValues(searcher.getIndexReader(), getField());
-    int docID = getDocID(productID);
-    long docLen = norms.get(docID);
-    return getTF(productID, term) / docLen;
+    long docLen = getDocLen(productID);
+    double tf = getTF(productID, term);
+    return Math.log(tf / docLen * Math.log(getIDF(term)) + 1);
   }
 }
 
-class TFDescriptionNormalizedFeature extends TFDescriptionFeature implements Feature {
+
+class TermSIGIRFeature extends IDFFeature implements Feature {
+  TermSIGIRFeature(String field) {
+    super(field);
+  }
+
   @Override
   public String getName() {
-    return "tf_description_norm";
+    return "tfidf_sigir_" + field;
   }
 
   @Override
   double calculateStatistics(Long productID, Term term) throws IOException {
-    NumericDocValues norms = MultiDocValues.getNormValues(searcher.getIndexReader(), getField());
-    int docID = getDocID(productID);
-    long docLen = norms.get(docID);
-    return getTF(productID, term) / docLen;
-  }
-}
-
-class TFTitleNormalizedSIGIRFeature extends TFTitleNormalizedFeature implements Feature {
-  @Override
-  public String getName() {
-    return "tf_title_norm_sigir";
-  }
-
-  @Override
-  double calculateStatistics(Long productID, Term term) throws IOException {
-    return Math.log(super.calculateStatistics(productID, term) + 1);
-  }
-}
-
-class TFDescriptionNormalizedSIGIRFeature extends TFDescriptionNormalizedFeature implements Feature {
-  @Override
-  public String getName() {
-    return "tf_description_norm_sigir";
-  }
-
-  @Override
-  double calculateStatistics(Long productID, Term term) throws IOException {
-    return Math.log(super.calculateStatistics(productID, term) + 1);
+    long docLen = getDocLen(productID);
+    double tf = getTF(productID, term);
+    double totalTF = searcher.getIndexReader().totalTermFreq(term);
+    double numDoc = searcher.getIndexReader().numDocs();
+    return Math.log(tf / docLen * totalTF / numDoc + 1);
   }
 }

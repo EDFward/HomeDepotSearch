@@ -23,26 +23,32 @@ public class FeatureExtraction {
     FeatureExtraction extractor = new FeatureExtraction();
 
     // To create a feature CSV with all features.
-    // extractor.createFeatureCSV("data/train.csv", "data/train-tmp.csv");
+    // extractor.createFeatureCSV("data/train.csv", "data/train-feature-14.csv");
+    // extractor.createFeatureCSV("data/test.csv", "data/test-feature-14.csv");
 
     // Or, add features to existing feature CSV file.
-    extractor.addFeatureCSV("data/test.csv", "data/test-feature-6.csv", "data/test-tmp-14.csv",
-        Arrays.asList(new TFTitleFeature(), new TFDescriptionFeature(),
-            new TFTitleSIGIRFeature(), new TFDescriptionSIGIRFeature(),
-            new TFTitleNormalizedFeature(), new TFDescriptionNormalizedFeature(),
-            new TFTitleNormalizedSIGIRFeature(), new TFDescriptionNormalizedSIGIRFeature()));
+    // extractor.addFeatureCSV("data/test.csv", "data/test-feature-14.csv", "data/test-feature-24.csv",
+    extractor.addFeatureCSV("data/train.csv", "data/train-feature-14.csv", "data/train-feature-24.csv",
+        Arrays.asList(new IDFFeature(Constant.FIELD_TITLE), new IDFFeature(Constant.FIELD_DESCRIPTION),
+            new IDFSIGIRFeature(Constant.FIELD_TITLE), new IDFSIGIRFeature(Constant.FIELD_DESCRIPTION),
+            new IDFSIGIR2Feature(Constant.FIELD_TITLE), new IDFSIGIR2Feature(Constant.FIELD_DESCRIPTION),
+            new IDFSIGIR3Feature(Constant.FIELD_TITLE), new IDFSIGIR3Feature(Constant.FIELD_DESCRIPTION),
+            new TermSIGIRFeature(Constant.FIELD_TITLE), new TermSIGIRFeature(Constant.FIELD_DESCRIPTION)));
   }
 
   public void createFeatureCSV(String inputQueryFilePath, String outputFeatureFilePath)
       throws IOException, ParseException {
-    List<Feature> features = Arrays.asList(
-        new BM25TitleFeature(), new BM25DescriptionFeature(),
-        new TFIDFTitleFeature(), new TFIDFDescriptionFeature(),
-        new OverlapTitleFeature(), new OverlapDescriptionFeature(),
-        new TFTitleFeature(), new TFDescriptionFeature(),
-        new TFTitleSIGIRFeature(), new TFDescriptionSIGIRFeature(),
-        new TFTitleNormalizedFeature(), new TFDescriptionNormalizedFeature(),
-        new TFTitleNormalizedSIGIRFeature(), new TFDescriptionNormalizedSIGIRFeature());
+    List<Feature> features = new ArrayList<>();
+    for (String field : Arrays.asList(Constant.FIELD_TITLE, Constant.FIELD_DESCRIPTION)) {
+      features.add(new BM25Feature(field));
+      features.add(new TFIDFFeature(field));
+      features.add(new OverlapFeature(field));
+      features.add(new TFFeature(field));
+      features.add(new TFSIGIRFeature(field));
+      features.add(new TFNormalizedFeature(field));
+      features.add(new TFNormalizedSIGIRFeature(field));
+    }
+
     // Automatic Resource Management.
     try (
         CSVParser queryFileParser = CSVParser.parse(

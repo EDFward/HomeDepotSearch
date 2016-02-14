@@ -16,16 +16,17 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 
 
-class SearchFeature extends FeatureBase {
+abstract class SearchFeature extends FieldFeatureBase {
+
   // Build query of sequential dependence model.
-  private final Query buildSDMQuery(String searchQuery, String field) throws ParseException {
+  private final Query buildSDMQuery(String searchQuery) throws ParseException {
     String[] terms = Arrays.stream(searchQuery.toLowerCase().split("\\s+"))
         .map(QueryParser::escape)
         .filter(s -> !s.equals("and") && !s.equals("or"))
         .toArray(String[]::new);
 
     // Also serve as a query builder.
-    QueryParser parser = new QueryParser(field, analyzer);
+    QueryParser parser = new QueryParser(getField(), analyzer);
 
     if (terms.length == 0) {
       // Simply parse the original search terms.
@@ -34,7 +35,7 @@ class SearchFeature extends FeatureBase {
 
     // Query part 1: 'OR' connected terms.
     Query concatQuery = parser.createBooleanQuery(
-        field,
+        getField(),
         Arrays.stream(terms).collect(Collectors.joining(" ")),
         BooleanClause.Occur.SHOULD);
     if (concatQuery == null) {
@@ -46,12 +47,12 @@ class SearchFeature extends FeatureBase {
         windowQueryBuilder = new BooleanQuery.Builder();
     for (int i = 0; i < terms.length - 1; ++i) {
       // Near query requires exact phrase match.
-      Query nearQuery = parser.createPhraseQuery(field, terms[i] + ' ' + terms[i + 1]);
+      Query nearQuery = parser.createPhraseQuery(getField(), terms[i] + ' ' + terms[i + 1]);
       if (nearQuery != null) {
         nearQueryBuilder.add(nearQuery, BooleanClause.Occur.SHOULD);
       }
       // Window size is 8.
-      Query windowQuery = parser.createPhraseQuery(field, terms[i] + ' ' + terms[i + 1], 8);
+      Query windowQuery = parser.createPhraseQuery(getField(), terms[i] + ' ' + terms[i + 1], 8);
       if (windowQuery != null) {
         windowQueryBuilder.add(windowQuery, BooleanClause.Occur.SHOULD);
       }
@@ -67,7 +68,7 @@ class SearchFeature extends FeatureBase {
     return finalQuery;
   }
 
-  protected final float score(Long productID, String searchQuery, String field, SearchSimilarity sim)
+  protected final float score(Long productID, String searchQuery, SearchSimilarity sim)
       throws ParseException, IOException {
 
     switch (sim) {
@@ -80,7 +81,7 @@ class SearchFeature extends FeatureBase {
     }
 
     Query idQuery = new TermQuery(new Term(Constant.FIELD_ID, productID.toString()));
-    Query sdmQuery = buildSDMQuery(searchQuery, field);
+    Query sdmQuery = buildSDMQuery(searchQuery);
 
     BooleanQuery query = new BooleanQuery.Builder()
         .add(idQuery, BooleanClause.Occur.FILTER)
@@ -101,53 +102,49 @@ class SearchFeature extends FeatureBase {
 }
 
 
-class BM25TitleFeature extends SearchFeature implements Feature {
+class BM25Feature extends SearchFeature implements Feature {
+  private final String field;
+
+  BM25Feature(String field) {
+    this.field = field;
+  }
+
   @Override
   public String getName() {
-    return "bm25_title";
+    return "bm25_" + field;
   }
 
   @Override
   public float getValue(Long productID, String searchTerms) throws IOException, ParseException {
-    return super.score(productID, searchTerms, Constant.FIELD_TITLE, SearchSimilarity.BM25);
+    return score(productID, searchTerms, SearchSimilarity.BM25);
+  }
+
+  @Override
+  protected String getField() {
+    return field;
   }
 }
 
 
-class BM25DescriptionFeature extends SearchFeature implements Feature {
+class TFIDFFeature extends SearchFeature implements Feature {
+  private final String field;
+
+  TFIDFFeature(String field) {
+    this.field = field;
+  }
+
   @Override
   public String getName() {
-    return "bm25_description";
+    return "tfidf_" + field;
   }
 
   @Override
   public float getValue(Long productID, String searchTerms) throws IOException, ParseException {
-    return super.score(productID, searchTerms, Constant.FIELD_DESCRIPTION, SearchSimilarity.BM25);
-  }
-}
-
-
-class TFIDFTitleFeature extends SearchFeature implements Feature {
-  @Override
-  public String getName() {
-    return "tfidf_title";
+    return score(productID, searchTerms, SearchSimilarity.CLASSIC);
   }
 
   @Override
-  public float getValue(Long productID, String searchTerms) throws IOException, ParseException {
-    return super.score(productID, searchTerms, Constant.FIELD_TITLE, SearchSimilarity.CLASSIC);
-  }
-}
-
-
-class TFIDFDescriptionFeature extends SearchFeature implements Feature {
-  @Override
-  public String getName() {
-    return "tfidf_description";
-  }
-
-  @Override
-  public float getValue(Long productID, String searchTerms) throws IOException, ParseException {
-    return super.score(productID, searchTerms, Constant.FIELD_DESCRIPTION, SearchSimilarity.CLASSIC);
+  protected String getField() {
+    return field;
   }
 }
